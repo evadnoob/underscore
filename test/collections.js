@@ -107,10 +107,46 @@ $(document).ready(function() {
     }
     ok(ifnull instanceof TypeError, 'handles a null (without inital value) properly');
 
+    var sum = _.reduceRight({a: 1, b: 2, c: 3}, function(sum, num){ return sum + num; });
+    equal(sum, 6, 'default initial value on object');
+
     ok(_.reduceRight(null, function(){}, 138) === 138, 'handles a null (with initial value) properly');
 
     equal(_.reduceRight([], function(){}, undefined), undefined, 'undefined can be passed as a special case');
     raises(function() { _.reduceRight([], function(){}); }, TypeError, 'throws an error for empty arrays with no initial value');
+
+    // Assert that the correct arguments are being passed.
+
+    var args,
+        memo = {},
+        object = {a: 1, b: 2},
+        lastKey = _.keys(object).pop();
+
+    var expected = lastKey == 'a'
+      ? [memo, 1, 'a', object]
+      : [memo, 2, 'b', object];
+
+    _.reduceRight(object, function() {
+      args || (args = _.toArray(arguments));
+    }, memo);
+
+    deepEqual(args, expected);
+
+    // And again, with numeric keys.
+
+    object = {'2': 'a', '1': 'b'};
+    lastKey = _.keys(object).pop();
+    args = null;
+
+    expected = lastKey == '2'
+      ? [memo, 'a', '2', object]
+      : [memo, 'b', '1', object];
+
+    _.reduceRight(object, function() {
+      args || (args = _.toArray(arguments));
+    }, memo);
+
+    deepEqual(args, expected);
   });
 
   test('find', function() {
@@ -135,6 +171,14 @@ $(document).ready(function() {
   test('reject', function() {
     var odds = _.reject([1, 2, 3, 4, 5, 6], function(num){ return num % 2 == 0; });
     equal(odds.join(', '), '1, 3, 5', 'rejected each even number');
+
+    var context = "obj";
+
+    var evens = _.reject([1, 2, 3, 4, 5, 6], function(num){
+      equal(context, "obj");
+      return num % 2 != 0;
+    }, context);
+    equal(evens.join(', '), '2, 4, 6', 'rejected each odd number');
   });
 
   test('all', function() {
@@ -206,6 +250,16 @@ $(document).ready(function() {
     equal(_.pluck(people, 'name').join(', '), 'moe, curly', 'pulls names out of objects');
   });
 
+  test('where', function() {
+    var list = [{a: 1, b: 2}, {a: 2, b: 2}, {a: 1, b: 3}, {a: 1, b: 4}];
+    var result = _.where(list, {a: 1});
+    equal(result.length, 3);
+    equal(result[result.length - 1].b, 4);
+    result = _.where(list, {b: 2});
+    equal(result.length, 2);
+    equal(result[0].a, 1);
+  });
+
   test('max', function() {
     equal(3, _.max([1, 2, 3]), 'can perform a regular Math.max');
 
@@ -214,6 +268,7 @@ $(document).ready(function() {
 
     equal(-Infinity, _.max({}), 'Maximum value of an empty object');
     equal(-Infinity, _.max([]), 'Maximum value of an empty array');
+    equal(_.max({'a': 'a'}), -Infinity, 'Maximum value of a non-numeric collection');
 
     equal(299999, _.max(_.range(1,300000)), "Maximum value of a too-big array");
   });
@@ -226,6 +281,7 @@ $(document).ready(function() {
 
     equal(Infinity, _.min({}), 'Minimum value of an empty object');
     equal(Infinity, _.min([]), 'Minimum value of an empty array');
+    equal(_.min({'a': 'a'}), Infinity, 'Minimum value of a non-numeric collection');
 
     var now = new Date(9999999999);
     var then = new Date(0);
@@ -245,6 +301,29 @@ $(document).ready(function() {
     var list = ["one", "two", "three", "four", "five"];
     var sorted = _.sortBy(list, 'length');
     equal(sorted.join(' '), 'one two four five three', 'sorted by length');
+
+    function Pair(x, y) {
+      this.x = x;
+      this.y = y;
+    }
+
+    var collection = [
+      new Pair(1, 1), new Pair(1, 2),
+      new Pair(1, 3), new Pair(1, 4),
+      new Pair(1, 5), new Pair(1, 6),
+      new Pair(2, 1), new Pair(2, 2),
+      new Pair(2, 3), new Pair(2, 4),
+      new Pair(2, 5), new Pair(2, 6),
+      new Pair(undefined, 1), new Pair(undefined, 2),
+      new Pair(undefined, 3), new Pair(undefined, 4),
+      new Pair(undefined, 5), new Pair(undefined, 6)
+    ];
+
+    var actual = _.sortBy(collection, function(pair) {
+      return pair.x;
+    });
+
+    deepEqual(actual, collection, 'sortBy should be stable');
   });
 
   test('groupBy', function() {
@@ -257,6 +336,23 @@ $(document).ready(function() {
     equal(grouped['3'].join(' '), 'one two six ten');
     equal(grouped['4'].join(' '), 'four five nine');
     equal(grouped['5'].join(' '), 'three seven eight');
+
+    var context = {};
+    _.groupBy([{}], function(){ ok(this === context); }, context);
+
+    grouped = _.groupBy([4.2, 6.1, 6.4], function(num) {
+      return Math.floor(num) > 4 ? 'hasOwnProperty' : 'constructor';
+    });
+    equal(grouped.constructor.length, 1);
+    equal(grouped.hasOwnProperty.length, 2);
+
+    var array = [{}];
+    _.groupBy(array, function(value, index, obj){ ok(obj === array); });
+
+    var array = [1, 2, 1, 2, 3];
+    var grouped = _.groupBy(array);
+    equal(grouped['1'].length, 2);
+    equal(grouped['3'].length, 1);
   });
 
   test('countBy', function() {
@@ -269,6 +365,23 @@ $(document).ready(function() {
     equal(grouped['3'], 4);
     equal(grouped['4'], 3);
     equal(grouped['5'], 3);
+
+    var context = {};
+    _.countBy([{}], function(){ ok(this === context); }, context);
+
+    grouped = _.countBy([4.2, 6.1, 6.4], function(num) {
+      return Math.floor(num) > 4 ? 'hasOwnProperty' : 'constructor';
+    });
+    equal(grouped.constructor, 1);
+    equal(grouped.hasOwnProperty, 2);
+
+    var array = [{}];
+    _.countBy(array, function(value, index, obj){ ok(obj === array); });
+
+    var array = [1, 2, 1, 2, 3];
+    var grouped = _.countBy(array);
+    equal(grouped['1'], 2);
+    equal(grouped['3'], 1);
   });
 
   test('sortedIndex', function() {
@@ -278,6 +391,15 @@ $(document).ready(function() {
 
     var indexFor30 = _.sortedIndex(numbers, 30);
     equal(indexFor30, 2, '30 should be inserted at index 2');
+
+    var objects = [{x: 10}, {x: 20}, {x: 30}, {x: 40}];
+    var iterator = function(obj){ return obj.x; };
+    strictEqual(_.sortedIndex(objects, {x: 25}, iterator), 2);
+    strictEqual(_.sortedIndex(objects, {x: 35}, 'x'), 3);
+
+    var context = {1: 2, 2: 3, 3: 4};
+    iterator = function(obj){ return this[obj]; };
+    strictEqual(_.sortedIndex([1, 3], 2, iterator, context), 1);
   });
 
   test('shuffle', function() {
@@ -297,13 +419,12 @@ $(document).ready(function() {
     var numbers = _.toArray({one : 1, two : 2, three : 3});
     equal(numbers.join(', '), '1, 2, 3', 'object flattened into array');
 
-    var objectWithToArrayFunction = {toArray: function() {
-        return [1, 2, 3];
-    }};
-    equal(_.toArray(objectWithToArrayFunction).join(', '), '1, 2, 3', 'toArray method used if present');
+    // test in IE < 9
+    try {
+      var actual = _.toArray(document.childNodes);
+    } catch(ex) { }
 
-    var objectWithToArrayValue = {toArray: 1};
-    equal(_.toArray(objectWithToArrayValue).join(', '), '1', 'toArray property ignored if not a function');
+    ok(_.isArray(actual), 'should not throw converting a node list');
   });
 
   test('size', function() {
@@ -317,6 +438,8 @@ $(document).ready(function() {
     equal(func(1, 2, 3, 4), 4, 'can test the size of the arguments object');
 
     equal(_.size('hello'), 5, 'can compute the size of a string');
+
+    equal(_.size(null), 0, 'handles nulls');
   });
 
 });

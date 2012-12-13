@@ -15,17 +15,22 @@ $(document).ready(function() {
   });
 
   test("values", function() {
-    equal(_.values({one : 1, two : 2}).join(', '), '1, 2', 'can extract the values from an object');
+    equal(_.values({one: 1, two: 2}).join(', '), '1, 2', 'can extract the values from an object');
+    equal(_.values({one: 1, two: 2, length: 3}).join(', '), '1, 2, 3', '... even when one of them is "length"');
   });
 
   test("pairs", function() {
     deepEqual(_.pairs({one: 1, two: 2}), [['one', 1], ['two', 2]], 'can convert an object into pairs');
+    deepEqual(_.pairs({one: 1, two: 2, length: 3}), [['one', 1], ['two', 2], ['length', 3]], '... even when one of them is "length"');
   });
 
   test("invert", function() {
     var obj = {first: 'Moe', second: 'Larry', third: 'Curly'};
     equal(_.keys(_.invert(obj)).join(' '), 'Moe Larry Curly', 'can invert an object');
     ok(_.isEqual(_.invert(_.invert(obj)), obj), 'two inverts gets you back where you started');
+
+    var obj = {length: 3};
+    ok(_.invert(obj)['3'] == 'length', 'can invert an object with "length"')
   });
 
   test("functions", function() {
@@ -48,6 +53,13 @@ $(document).ready(function() {
     ok(_.isEqual(result, {x:2, a:'b'}), 'extending from multiple source objects last property trumps');
     result = _.extend({}, {a: void 0, b: null});
     equal(_.keys(result).join(''), 'ab', 'extend does not copy undefined values');
+
+    try {
+      result = {};
+      _.extend(result, null, undefined, {a:1});
+    } catch(ex) {}
+
+    equal(result.a, 1, 'should not error on `null` or `undefined` sources');
   });
 
   test("pick", function() {
@@ -91,6 +103,13 @@ $(document).ready(function() {
     equal(options.empty, "", 'value exists');
     ok(_.isNaN(options.nan), "NaN isn't overridden");
     equal(options.word, "word", 'new value is added, first one wins');
+
+    try {
+      options = {};
+      _.defaults(options, null, undefined, {a:1});
+    } catch(ex) {}
+
+    equal(options.a, 1, 'should not error on `null` or `undefined` sources');
   });
 
   test("clone", function() {
@@ -332,16 +351,13 @@ $(document).ready(function() {
 
     // Chaining.
     ok(!_.isEqual(_({x: 1, y: undefined}).chain(), _({x: 1, z: 2}).chain()), 'Chained objects containing different values are not equal');
-    equal(_({x: 1, y: 2}).chain().isEqual(_({x: 1, y: 2}).chain()).value(), true, '`isEqual` can be chained');
 
-    // Custom `isEqual` methods.
-    var isEqualObj = {isEqual: function (o) { return o.isEqual == this.isEqual; }, unique: {}};
-    var isEqualObjClone = {isEqual: isEqualObj.isEqual, unique: {}};
+    a = _({x: 1, y: 2}).chain();
+    b = _({x: 1, y: 2}).chain();
+    equal(_.isEqual(a.isEqual(b), _(true)), true, '`isEqual` can be chained');
 
-    ok(_.isEqual(isEqualObj, isEqualObjClone), 'Both objects implement identical `isEqual` methods');
-    ok(_.isEqual(isEqualObjClone, isEqualObj), 'Commutative equality is implemented for objects with custom `isEqual` methods');
-    ok(!_.isEqual(isEqualObj, {}), 'Objects that do not implement equivalent `isEqual` methods are not equal');
-    ok(!_.isEqual({}, isEqualObj), 'Commutative equality is implemented for objects with different `isEqual` methods');
+    // Objects from another frame.
+    ok(_.isEqual({}, iObject));
   });
 
   test("isEmpty", function() {
@@ -378,6 +394,7 @@ $(document).ready(function() {
       parent.iNull      = null;\
       parent.iBoolean   = new Boolean(false);\
       parent.iUndefined = undefined;\
+      parent.iObject     = {};\
     </script>"
   );
   iDoc.close();
@@ -476,7 +493,9 @@ $(document).ready(function() {
     ok(!_.isFinite(NaN), 'NaN is not Finite');
     ok(!_.isFinite(Infinity), 'Infinity is not Finite');
     ok(!_.isFinite(-Infinity), '-Infinity is not Finite');
-    ok(!_.isFinite('12'), 'Strings are not numbers');
+    ok(_.isFinite('12'), 'Numeric strings are numbers');
+    ok(!_.isFinite('1a'), 'Non numeric strings are not numbers');
+    ok(!_.isFinite(''), 'Empty strings are not numbers');
     var obj = new Number(5);
     ok(_.isFinite(obj), 'Number instances can be finite');
     ok(_.isFinite(0), '0 is Finite');
@@ -535,5 +554,17 @@ $(document).ready(function() {
       tap(interceptor).
       value();
     ok(returned == 6 && intercepted == 6, 'can use tapped objects in a chain');
+  });
+  
+  test("has", function () {
+     var obj = {foo: "bar", func: function () {} };
+     ok (_.has(obj, "foo"), "has() checks that the object has a property.");
+     ok (_.has(obj, "baz") == false, "has() returns false if the object doesn't have the property.");
+     ok (_.has(obj, "func"), "has() works for functions too.");
+     obj.hasOwnProperty = null;
+     ok (_.has(obj, "foo"), "has() works even when the hasOwnProperty method is deleted.");
+     child = {};
+     child.prototype = obj;
+     ok (_.has(child, "foo") == false, "has() does not check the prototype chain for a property.")
   });
 });
