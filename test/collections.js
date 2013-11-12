@@ -22,7 +22,7 @@ $(document).ready(function() {
     equal(answers.join(", "), 'one, two, three', 'iterating over objects works, and ignores the object prototype.');
     delete obj.constructor.prototype.four;
 
-    answer = null;
+    var answer = null;
     _.each([1, 2, 3], function(num, index, arr){ if (_.include(arr, num)) answer = true; });
     ok(answer, 'can reference the original collection from inside the iterator');
 
@@ -76,13 +76,16 @@ $(document).ready(function() {
     var sum = _.reduce([1, 2, 3], function(sum, num){ return sum + num; });
     equal(sum, 6, 'default initial value');
 
+    var prod = _.reduce([1, 2, 3, 4], function(prod, num){ return prod * num; });
+    equal(prod, 24, 'can reduce via multiplication');
+
     var ifnull;
     try {
       _.reduce(null, function(){});
     } catch (ex) {
       ifnull = ex;
     }
-    ok(ifnull instanceof TypeError, 'handles a null (without inital value) properly');
+    ok(ifnull instanceof TypeError, 'handles a null (without initial value) properly');
 
     ok(_.reduce(null, function(){}, 138) === 138, 'handles a null (with initial value) properly');
     equal(_.reduce([], function(){}, undefined), undefined, 'undefined can be passed as a special case');
@@ -105,7 +108,7 @@ $(document).ready(function() {
     } catch (ex) {
       ifnull = ex;
     }
-    ok(ifnull instanceof TypeError, 'handles a null (without inital value) properly');
+    ok(ifnull instanceof TypeError, 'handles a null (without initial value) properly');
 
     var sum = _.reduceRight({a: 1, b: 2, c: 3}, function(sum, num){ return sum + num; });
     equal(sum, 6, 'default initial value on object');
@@ -258,6 +261,25 @@ $(document).ready(function() {
     result = _.where(list, {b: 2});
     equal(result.length, 2);
     equal(result[0].a, 1);
+
+    result = _.where(list, {a: 1}, true);
+    equal(result.b, 2, "Only get the first object matched.")
+    result = _.where(list, {a: 1}, false);
+    equal(result.length, 3);
+  });
+
+  test('findWhere', function() {
+    var list = [{a: 1, b: 2}, {a: 2, b: 2}, {a: 1, b: 3}, {a: 1, b: 4}, {a: 2, b: 4}];
+    var result = _.findWhere(list, {a: 1});
+    deepEqual(result, {a: 1, b: 2});
+    result = _.findWhere(list, {b: 4});
+    deepEqual(result, {a: 1, b: 4});
+
+    result = _.findWhere(list, {c:1})
+    ok(_.isUndefined(result), "undefined when not found");
+
+    result = _.findWhere([], {c:1});
+    ok(_.isUndefined(result), "undefined when searching empty list");
   });
 
   test('max', function() {
@@ -324,6 +346,9 @@ $(document).ready(function() {
     });
 
     deepEqual(actual, collection, 'sortBy should be stable');
+
+    var list = ['q', 'w', 'e', 'r', 't', 'y'];
+    strictEqual(_.sortBy(list).join(''), 'eqrtwy', 'uses _.identity if iterator is not specified');
   });
 
   test('groupBy', function() {
@@ -353,6 +378,32 @@ $(document).ready(function() {
     var grouped = _.groupBy(array);
     equal(grouped['1'].length, 2);
     equal(grouped['3'].length, 1);
+
+    var matrix = [
+      [1,2],
+      [1,3],
+      [2,3]
+    ];
+    deepEqual(_.groupBy(matrix, 0), {1: [[1,2], [1,3]], 2: [[2,3]]})
+    deepEqual(_.groupBy(matrix, 1), {2: [[1,2]], 3: [[1,3], [2,3]]})
+  });
+
+  test('indexBy', function() {
+    var parity = _.indexBy([1, 2, 3, 4, 5], function(num){ return num % 2 == 0; });
+    equal(parity['true'], 4);
+    equal(parity['false'], 5);
+
+    var list = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+    var grouped = _.indexBy(list, 'length');
+    equal(grouped['3'], 'ten');
+    equal(grouped['4'], 'nine');
+    equal(grouped['5'], 'eight');
+
+    var array = [1, 2, 1, 2, 3];
+    var grouped = _.indexBy(array);
+    equal(grouped['1'], 1);
+    equal(grouped['2'], 2);
+    equal(grouped['3'], 3);
   });
 
   test('countBy', function() {
@@ -409,6 +460,20 @@ $(document).ready(function() {
     equal(shuffled.join(','), numbers.join(','), 'contains the same members before and after shuffle');
   });
 
+  test('sample', function() {
+    var numbers = _.range(10);
+    var all_sampled = _.sample(numbers, 10).sort();
+    equal(all_sampled.join(','), numbers.join(','), 'contains the same members before and after sample');
+    all_sampled = _.sample(numbers, 20).sort();
+    equal(all_sampled.join(','), numbers.join(','), 'also works when sampling more objects than are present');
+    ok(_.contains(numbers, _.sample(numbers)), 'sampling a single element returns something from the array');
+    strictEqual(_.sample([]), undefined, 'sampling empty array with no number returns undefined');
+    notStrictEqual(_.sample([], 5), [], 'sampling empty array with a number returns an empty array');
+    notStrictEqual(_.sample([1, 2, 3], 0), [], 'sampling an array with 0 picks returns an empty array');
+    deepEqual(_.sample([1, 2], -1), [], 'sampling a negative number of picks returns an empty array');
+    ok(_.contains([1, 2, 3], _.sample({a: 1, b: 2, c: 3})), 'sample one value from an object');
+  });
+
   test('toArray', function() {
     ok(!_.isArray(arguments), 'arguments object is not an array');
     ok(_.isArray(_.toArray(arguments)), 'arguments object converted into array');
@@ -430,6 +495,7 @@ $(document).ready(function() {
   test('size', function() {
     equal(_.size({one : 1, two : 2, three : 3}), 3, 'can compute the size of an object');
     equal(_.size([1, 2, 3]), 3, 'can compute the size of an array');
+    equal(_.size($('<div>').add('<span>').add('<span>')), 3, 'can compute the size of jQuery objects');
 
     var func = function() {
       return _.size(arguments);
@@ -437,7 +503,8 @@ $(document).ready(function() {
 
     equal(func(1, 2, 3, 4), 4, 'can test the size of the arguments object');
 
-    equal(_.size('hello'), 5, 'can compute the size of a string');
+    equal(_.size('hello'), 5, 'can compute the size of a string literal');
+    equal(_.size(new String('hello')), 5, 'can compute the size of string object');
 
     equal(_.size(null), 0, 'handles nulls');
   });
